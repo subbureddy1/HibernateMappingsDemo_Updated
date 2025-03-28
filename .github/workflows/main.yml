@@ -1,0 +1,59 @@
+name: Maven Build & SonarCloud Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - devlop
+  pull_request:
+    branches:
+      - main
+      - master
+      - devlop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Required for SonarCloud analysis
+
+      - name: Find pom.xml Directory
+        id: find_pom
+        run: echo "POM_DIR=$(find . -name 'pom.xml' -exec dirname {} \; | head -n 1)" >> $GITHUB_ENV
+
+      - name: Verify pom.xml Location
+        run: |
+          if [ -z "$POM_DIR" ]; then
+            echo "❌ No pom.xml found! Exiting..."
+            exit 1
+          fi
+          echo "✅ Found pom.xml in: $POM_DIR"
+
+      - name: Set Up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build with Maven
+        run: mvn clean install
+        working-directory: ${{ env.POM_DIR }}
+
+      - name: SonarCloud Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # SonarCloud authentication token
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=hibernet
+            -Dsonar.organization=hibernet
+            -Dsonar.host.url=https://sonarcloud.io 
+            -Dsonar.login=$SONAR_TOKEN
+        working-directory: ${{ env.POM_DIR }}
+
+      - name: Check Build Success
+        run: echo "✅ Maven Build and SonarCloud Analysis Completed Successfully!"
